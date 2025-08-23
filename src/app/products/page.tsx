@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
 
 type Round = { id: string; title: string; deadline: string; status: 'open'|'closed' }
 type Product = { id: string; round_id: string; name: string; price: number; visible: boolean; sort_order: number }
@@ -18,7 +17,6 @@ export default function ProductsPage() {
       setLoading(true)
       setError(null)
 
-      // 현재 open 상태인 라운드 1개 가져오기
       const { data: rounds, error: rErr } = await supabase
         .from('rounds')
         .select('*')
@@ -27,6 +25,7 @@ export default function ProductsPage() {
         .limit(1)
 
       if (rErr) { setError(rErr.message); setLoading(false); return }
+
       const current = rounds?.[0]
       setRound(current ?? null)
 
@@ -41,24 +40,20 @@ export default function ProductsPage() {
         if (pErr) { setError(pErr.message); setLoading(false); return }
         setProducts(prods ?? [])
       }
-
       setLoading(false)
     }
     load()
   }, [])
 
-  if (loading) return <main className="p-6">불러오는 중…</main>
-  if (error) return <main className="p-6 text-red-600">오류: {error}</main>
+  if (loading) return <main>불러오는 중…</main>
+  if (error) return <main className="text-red-600">오류: {error}</main>
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <header className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">상품 선택</h1>
-          {round && <p className="text-sm text-gray-600">{round.title} · 마감: {new Date(round.deadline).toLocaleString()}</p>}
-        </div>
-        <Link href="/login" className="underline">로그인</Link>
-      </header>
+    <main>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">상품 선택</h1>
+        {round && <p className="text-sm text-gray-600">{round.title} · 마감: {new Date(round.deadline).toLocaleString()}</p>}
+      </div>
 
       {(!round || products.length === 0) ? (
         <p>현재 선택할 수 있는 상품이 없습니다.</p>

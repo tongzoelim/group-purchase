@@ -19,7 +19,7 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.replace('/complete-profile')
+      router.replace('/')
     } catch (err: any) {
       setMsg(`로그인 실패: ${err?.message || String(err)}`)
     } finally {
