@@ -18,21 +18,19 @@ function initClient(): SupabaseClient {
 /**
  * 기존 사용법 유지:
  *   import { supabase } from '@/lib/supabase'
- * supabase.xxx 접근 시점에 클라이언트를 초기화합니다.
+ * supabase의 프로퍼티/메서드에 접근하는 순간 클라이언트가 초기화됩니다.
+ * (any 사용 없음)
  */
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_target, prop, receiver) {
     const client = initClient()
-    // @ts-expect-error - 동적 포워딩
-    const value = client[prop]
-    return typeof value === 'function' ? value.bind(client) : Reflect.get(client as any, prop, receiver)
+    // any 없이 Reflect.get 사용
+    const value = Reflect.get(client as object, prop, receiver)
+    return typeof value === 'function' ? value.bind(client) : value
   },
 }) as SupabaseClient
 
-/**
- * (옵션) 함수형으로 쓰고 싶은 곳을 위한 헬퍼
- *   const supabase = getSupabase()
- */
+/** (옵션) 함수형으로 쓰고 싶은 곳에서 사용 */
 export function getSupabase(): SupabaseClient {
   return initClient()
 }

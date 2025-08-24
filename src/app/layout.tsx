@@ -1,6 +1,8 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import Header from '@/components/Header'
+export const dynamic = 'force-dynamic'
+
 
 export const metadata: Metadata = {
   title: '공동구매 포털',

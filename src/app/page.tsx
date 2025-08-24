@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+export const dynamic = 'force-dynamic'
+
 
 type Profile = { name: string | null; student_id: string | null }
 type OrderRow = {

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+export const dynamic = 'force-dynamic'
+
 
 type Round = { id: string; title: string; deadline: string; status: 'open'|'closed' }
 

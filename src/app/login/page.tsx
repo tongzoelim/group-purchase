@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+export const dynamic = 'force-dynamic'
+
 
 export default function LoginPage() {
   const router = useRouter()

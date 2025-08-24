@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+export const dynamic = 'force-dynamic'
+
 
 type Round = { id: string; title: string; deadline: string; status: 'open'|'closed' }
 type Product = { id: string; name: string; price: number; visible: boolean; sort_order: number }

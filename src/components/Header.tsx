@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+export const dynamic = 'force-dynamic'
 
 type SessionUser = { id: string; email?: string | null }
 
