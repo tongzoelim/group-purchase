@@ -11,7 +11,7 @@ type OrderRow = {
   total_qty: number
   total_amount: number
   updated_at: string
-  rounds?: { title: string } | null
+  roundsTitle: string | null   // ← 단일 문자열로 정규화
 }
 type Round = { id: string; title: string; deadline: string; status: 'open' | 'closed' }
 
@@ -44,7 +44,7 @@ export default function Dashboard() {
         .eq('id', user.id)
         .single()
 
-      // 최근 주문 5개 (라운드 제목 포함)
+      // 최근 주문 5개 (라운드 제목 포함) — rounds(title)는 배열일 수도 있으니 정규화 필요
       const p2 = supabase
         .from('orders')
         .select('id, status, total_qty, total_amount, updated_at, rounds(title)')
@@ -64,8 +64,28 @@ export default function Dashboard() {
       if (pRes.error) setError(pRes.error.message)
       else setProfile(pRes.data)
 
-      if (oRes.error) setError(oRes.error.message)
-      else setOrders(oRes.data ?? [])
+      if (oRes.error) {
+        setError(oRes.error.message)
+      } else {
+        const rows = (oRes.data ?? []).map((o: any): OrderRow => {
+          // rounds 가 배열로 오기도, 객체로 오기도 함 → 단일 제목으로 정규화
+          let roundsTitle: string | null = null
+          if (Array.isArray(o.rounds)) {
+            roundsTitle = o.rounds[0]?.title ?? null
+          } else if (o.rounds && typeof o.rounds === 'object') {
+            roundsTitle = o.rounds.title ?? null
+          }
+          return {
+            id: String(o.id),
+            status: (o.status ?? 'draft') as 'draft' | 'submitted',
+            total_qty: Number(o.total_qty ?? 0),
+            total_amount: Number(o.total_amount ?? 0),
+            updated_at: String(o.updated_at ?? new Date().toISOString()),
+            roundsTitle,
+          }
+        })
+        setOrders(rows)
+      }
 
       if (rRes.error) setError(rRes.error.message)
       else setRounds(rRes.data ?? [])
@@ -82,7 +102,6 @@ export default function Dashboard() {
         setProfile(null)
         setOrders(null)
       } else {
-        // 세션 변화가 있으면 다시 로드
         ;(async () => {
           const { data } = await supabase
             .from('profiles')
@@ -142,16 +161,16 @@ export default function Dashboard() {
       <section className="rounded border p-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">내 주문 상태</h2>
-          <Link href="/products" className="text-sm underline">상품 선택하기</Link>
+          <Link href="/rounds" className="text-sm underline">회차 선택하기</Link>
         </div>
         {orders && orders.length > 0 ? (
           <ul className="mt-3 divide-y">
             {orders.map(o => (
               <li key={o.id} className="py-2 flex items-center justify-between text-sm">
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{o.rounds?.title ?? '회차'}</div>
+                  <div className="font-medium truncate">{o.roundsTitle ?? '회차'}</div>
                   <div className="text-gray-600">
-                    수량 {o.total_qty ?? 0} · 금액 {(o.total_amount ?? 0).toLocaleString()}원 · {o.status === 'submitted' ? '제출됨' : '작성중'}
+                    수량 {o.total_qty} · 금액 {o.total_amount.toLocaleString()}원 · {o.status === 'submitted' ? '제출됨' : '작성중'}
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">{new Date(o.updated_at).toLocaleString()}</div>
@@ -175,7 +194,7 @@ export default function Dashboard() {
               <li key={r.id} className="rounded border p-3">
                 <div className="font-medium">{r.title}</div>
                 <div className="text-xs text-gray-600 mt-1">마감: {new Date(r.deadline).toLocaleString()}</div>
-                <Link href="/rounds" className="mt-2 inline-block text-sm underline">참여하기</Link>
+                <Link href={`/rounds/${r.id}`} className="mt-2 inline-block text-sm underline">참여하기</Link>
               </li>
             ))}
           </ul>
@@ -187,7 +206,6 @@ export default function Dashboard() {
   )
 }
 
-/** 비로그인 상태에서만 쓰는 간단 미리보기 컴포넌트 */
 function OpenRoundsPreview() {
   const [items, setItems] = useState<Round[] | null>(null)
   useEffect(() => {
