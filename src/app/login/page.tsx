@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -12,6 +12,12 @@ export default function LoginPage() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) router.replace('/')
+    })
+  }, [router])
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setMsg('')
@@ -19,9 +25,10 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.replace('/')
-    } catch (err: any) {
-      setMsg(`로그인 실패: ${err?.message || String(err)}`)
+      router.replace('/') // 대시보드로
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '알 수 없는 오류'
+      setMsg(`로그인 실패: ${message}`)
     } finally {
       setLoading(false)
     }
@@ -31,27 +38,9 @@ export default function LoginPage() {
     <main className="max-w-md mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">로그인</h1>
       <form onSubmit={onSubmit} className="space-y-3">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e)=>setEmail(e.target.value)}
-          placeholder="이메일"
-          className="w-full border rounded px-3 py-2"
-        />
-        <input
-          type="password"
-          required
-          value={password}
-          onChange={(e)=>setPassword(e.target.value)}
-          placeholder="비밀번호"
-          className="w-full border rounded px-3 py-2"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-black text-white rounded py-2"
-        >
+        <input type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="이메일" className="w-full border rounded px-3 py-2" />
+        <input type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="비밀번호" className="w-full border rounded px-3 py-2" />
+        <button type="submit" disabled={loading} className="w-full bg-black text-white rounded py-2">
           {loading ? '로그인 중…' : '로그인'}
         </button>
       </form>
