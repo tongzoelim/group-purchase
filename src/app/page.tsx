@@ -11,9 +11,19 @@ type OrderRow = {
   total_qty: number
   total_amount: number
   updated_at: string
-  roundsTitle: string | null   // ← 단일 문자열로 정규화
+  roundsTitle: string | null
 }
 type Round = { id: string; title: string; deadline: string; status: 'open' | 'closed' }
+
+/** Supabase에서 조인 응답이 배열/객체로 섞여 올 수 있어 raw 타입을 유연하게 정의 */
+type RawOrderRow = {
+  id: string | number
+  status?: 'draft' | 'submitted' | null
+  total_qty?: number | null
+  total_amount?: number | null
+  updated_at?: string | null
+  rounds?: { title?: string | null }[] | { title?: string | null } | null
+}
 
 export default function Dashboard() {
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
@@ -44,14 +54,12 @@ export default function Dashboard() {
         .eq('id', user.id)
         .single()
 
-      // 최근 주문 5개 (라운드 제목 포함) — rounds(title)는 배열일 수도 있으니 정규화 필요
       const p2 = supabase
         .from('orders')
         .select('id, status, total_qty, total_amount, updated_at, rounds(title)')
         .order('updated_at', { ascending: false })
         .limit(5)
 
-      // 열린 회차 최대 3개
       const p3 = supabase
         .from('rounds')
         .select('id, title, deadline, status')
@@ -67,13 +75,13 @@ export default function Dashboard() {
       if (oRes.error) {
         setError(oRes.error.message)
       } else {
-        const rows = (oRes.data ?? []).map((o: any): OrderRow => {
-          // rounds 가 배열로 오기도, 객체로 오기도 함 → 단일 제목으로 정규화
+        const rows: OrderRow[] = (oRes.data ?? []).map((o: RawOrderRow) => {
           let roundsTitle: string | null = null
-          if (Array.isArray(o.rounds)) {
-            roundsTitle = o.rounds[0]?.title ?? null
-          } else if (o.rounds && typeof o.rounds === 'object') {
-            roundsTitle = o.rounds.title ?? null
+          const r = o.rounds
+          if (Array.isArray(r)) {
+            roundsTitle = r[0]?.title ?? null
+          } else if (r && typeof r === 'object') {
+            roundsTitle = r.title ?? null
           }
           return {
             id: String(o.id),
@@ -93,7 +101,7 @@ export default function Dashboard() {
       setLoading(false)
     }
 
-    init()
+    void init()
 
     // 로그인/로그아웃 실시간 반영
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
