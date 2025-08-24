@@ -31,13 +31,13 @@ export default function Header() {
 
         {!user ? (
           <nav className="flex gap-4 text-sm">
-            <Link href="/products" className="underline">회차 확인</Link>
+            <Link href="/rounds" className="underline">회차 확인</Link>
             <Link href="/login" className="underline">로그인</Link>
             <Link href="/signup" className="underline">회원가입</Link>
           </nav>
         ) : (
           <nav className="flex items-center gap-4 text-sm">
-            <Link href="/products" className="underline">회차 확인</Link>
+            <Link href="/rounds" className="underline">회차 확인</Link>
             <Link href="/me" className="underline">내 프로필</Link>
             <button onClick={logout} className="rounded border px-3 py-1">로그아웃</button>
           </nav>

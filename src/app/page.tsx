@@ -167,7 +167,7 @@ export default function Dashboard() {
       <section className="rounded border p-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">열린 회차</h2>
-          <Link href="/products" className="text-sm underline">모두 보기</Link>
+          <Link href="/rounds" className="text-sm underline">모두 보기</Link>
         </div>
         {rounds && rounds.length > 0 ? (
           <ul className="mt-3 grid md:grid-cols-3 gap-3">
@@ -175,7 +175,7 @@ export default function Dashboard() {
               <li key={r.id} className="rounded border p-3">
                 <div className="font-medium">{r.title}</div>
                 <div className="text-xs text-gray-600 mt-1">마감: {new Date(r.deadline).toLocaleString()}</div>
-                <Link href="/products" className="mt-2 inline-block text-sm underline">참여하기</Link>
+                <Link href="/rounds" className="mt-2 inline-block text-sm underline">참여하기</Link>
               </li>
             ))}
           </ul>
