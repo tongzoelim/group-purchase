@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 type SessionUser = { id: string; email?: string | null }
+type ProfileRow = { is_admin: boolean | null }
 
 export default function Header() {
   const [user, setUser] = useState<SessionUser | null>(null)
-  const [safe, setSafe] = useState(false) // Supabase 호출 가능 여부
+  const [safe, setSafe] = useState(false)       // Supabase 호출 가능 여부
+  const [isAdmin, setIsAdmin] = useState(false) // 관리자 여부
 
+  // 1) Supabase 사용 가능 여부 확인 + 로그인 상태 구독
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -27,6 +30,7 @@ export default function Header() {
 
         // 초기 세션
         supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+
         // 상태 변경 구독
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
           setUser(session?.user ?? null)
@@ -39,6 +43,33 @@ export default function Header() {
     }
     run()
   }, [])
+
+  // 2) 프로필 로드해서 is_admin 반영 (user가 생길 때마다)
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!safe || !user) {
+        setIsAdmin(false)
+        return
+      }
+      try {
+        const { getSupabase } = await import('@/lib/supabase')
+        const supabase = getSupabase()
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single<ProfileRow>()
+        if (error) {
+          setIsAdmin(false)
+          return
+        }
+        setIsAdmin(Boolean(data?.is_admin))
+      } catch {
+        setIsAdmin(false)
+      }
+    }
+    loadProfile()
+  }, [safe, user])
 
   return (
     <header className="border-b">
@@ -58,8 +89,14 @@ export default function Header() {
           </nav>
         ) : (
           <nav className="flex items-center gap-4 text-sm">
+            {/* ✅ 관리자만 보이는 링크 */}
+            {isAdmin && (
+              <Link href="/admin" className="underline">관리자</Link>
+            )}
+
             <Link href="/rounds" className="underline">회차 확인</Link>
             <Link href="/me" className="underline">내 프로필</Link>
+
             <button
               onClick={async () => {
                 try {

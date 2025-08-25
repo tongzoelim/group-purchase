@@ -1,110 +1,95 @@
-// src/app/admin/page.tsx
 'use client'
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
 
-type ProductRow = {
-  id: string; name: string; price: number;
-  stock_limit: number; stock_sold: number; stock_remaining: number;
-  round_id: string;
-}
+type Round = { id: string; title: string; deadline: string; status: 'open' | 'closed' }
+type Profile = { is_admin: boolean }
 
-export default function AdminPage() {
+export default function AdminHome() {
   const router = useRouter()
-  const [ok, setOk] = useState<boolean | null>(null)
-  const [rows, setRows] = useState<ProductRow[]>([])
-  const [msg, setMsg] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const [rounds, setRounds] = useState<Round[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const run = async () => {
+    const load = async () => {
+      setLoading(true)
+      setError(null)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
-      const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-      if (!me?.is_admin) { router.replace('/'); return }
-      setOk(true)
 
-      const { data, error } = await supabase
-        .from('product_availability')
-        .select('product_id, round_id, name, price, stock_limit, stock_sold, stock_remaining')
-        .order('name', { ascending: true })
-      if (error) setMsg(error.message)
-      else setRows((data ?? []).map(d => ({
-        id: d.product_id, name: d.name, price: d.price,
-        stock_limit: d.stock_limit, stock_sold: d.stock_sold, stock_remaining: d.stock_remaining,
-        round_id: d.round_id
-      })))
+      const pr = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single<Profile>()
+      if (pr.error || !pr.data?.is_admin) {
+        setIsAdmin(false)
+        setLoading(false)
+        return
+      }
+      setIsAdmin(true)
+
+      const rr = await supabase
+        .from('rounds')
+        .select('id,title,deadline,status')
+        .order('created_at', { ascending: false })
+      if (rr.error) { setError(rr.error.message); setLoading(false); return }
+      setRounds(rr.data ?? [])
+      setLoading(false)
     }
-    run()
+    void load()
   }, [router])
 
-  if (ok === null) return <main className="p-6">확인 중…</main>
-  if (!ok) return null
-
-  const updateLimit = async (id: string, newLimit: number) => {
-    setMsg('')
-    const { error } = await supabase.from('products').update({ stock_limit: newLimit }).eq('id', id)
-    if (error) setMsg(error.message)
-    else {
-      // 갱신
-      const { data } = await supabase
-        .from('product_availability')
-        .select('product_id, round_id, name, price, stock_limit, stock_sold, stock_remaining')
-        .order('name', { ascending: true })
-      setRows((data ?? []).map(d => ({
-        id: d.product_id, name: d.name, price: d.price,
-        stock_limit: d.stock_limit, stock_sold: d.stock_sold, stock_remaining: d.stock_remaining,
-        round_id: d.round_id
-      })))
-    }
-  }
+  if (loading) return <main className="p-6">불러오는 중…</main>
+  if (!isAdmin) return (
+    <main className="p-6">
+      <h1 className="text-2xl font-bold">관리자 메뉴</h1>
+      <p className="mt-2 text-red-600">접근 권한이 없습니다.</p>
+    </main>
+  )
 
   return (
     <main className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">관리자 설정</h1>
-      <p className="text-sm text-gray-600">상품별 총한도(재고)를 설정하고, 남은 수량을 확인합니다.</p>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">관리자 메뉴</h1>
+        <Link href="/" className="underline text-sm">← 대시보드</Link>
+      </div>
 
-      <table className="w-full text-sm border">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className="p-2 border">회차</th>
-            <th className="p-2 border">상품</th>
-            <th className="p-2 border">가격</th>
-            <th className="p-2 border">총한도</th>
-            <th className="p-2 border">판매누계</th>
-            <th className="p-2 border">남은수량</th>
-            <th className="p-2 border">수정</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.id}>
-              <td className="p-2 border"><Link className="underline" href={`/rounds/${r.round_id}`}>{r.round_id.slice(0,8)}</Link></td>
-              <td className="p-2 border">{r.name}</td>
-              <td className="p-2 border">{r.price.toLocaleString()}원</td>
-              <td className="p-2 border">
-                <input
-                  type="number"
-                  className="w-24 border rounded px-2 py-1"
-                  defaultValue={r.stock_limit}
-                  onBlur={(e)=>updateLimit(r.id, Math.max(0, parseInt(e.target.value || '0', 10)))}
-                />
-              </td>
-              <td className="p-2 border">{r.stock_sold}</td>
-              <td className="p-2 border">{r.stock_remaining}</td>
-              <td className="p-2 border"><button className="border rounded px-2 py-1" onClick={()=>{
-                const el = (document.activeElement as HTMLInputElement)
-                el?.blur()
-              }}>적용</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {error && <p className="text-red-600">{error}</p>}
 
-      {msg && <p className="text-red-600">{msg}</p>}
+      <section className="rounded border p-4">
+        <h2 className="font-semibold">회차 목록</h2>
+        {rounds.length === 0 ? (
+          <p className="text-sm text-gray-600 mt-2">회차가 없습니다.</p>
+        ) : (
+          <ul className="mt-3 divide-y">
+            {rounds.map(r => (
+              <li key={r.id} className="py-3 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-medium">{r.title} <span className="text-xs text-gray-500">({r.status})</span></div>
+                  <div className="text-xs text-gray-600">마감: {new Date(r.deadline).toLocaleString()}</div>
+                </div>
+                <div className="flex gap-3">
+                  <Link href={`/admin/rounds/${r.id}`} className="underline text-sm">집계 보기</Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   )
 }
+<div className="flex items-center justify-between">
+  <h1 className="text-2xl font-bold">관리자 메뉴</h1>
+  <div className="flex items-center gap-3">
+    <Link href="/admin/rounds/new" className="text-sm rounded border px-3 py-1">회차 등록</Link>
+    <Link href="/" className="underline text-sm">← 대시보드</Link>
+  </div>
+</div>

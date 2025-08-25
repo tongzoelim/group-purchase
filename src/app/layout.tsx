@@ -1,8 +1,8 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import Header from '@/components/Header'
-export const dynamic = 'force-dynamic'
 
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: '공동구매 포털',
@@ -12,9 +12,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body>
+      <body className="bg-gray-50 min-h-screen text-gray-900 antialiased">
         <Header />
-        <div className="max-w-4xl mx-auto p-6">{children}</div>
+        <main className="max-w-4xl mx-auto p-6">
+          {children}
+        </main>
       </body>
     </html>
   )
