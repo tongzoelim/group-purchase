@@ -68,7 +68,6 @@ export default function AdminRoundPage() {
       }
       setIsAdmin(true)
 
-      // 회차 정보
       const r1 = await supabase
         .from('rounds')
         .select('id,title,deadline,status')
@@ -77,22 +76,12 @@ export default function AdminRoundPage() {
       if (r1.error) { setError(r1.error.message); setLoading(false); return }
       setRound(r1.data)
 
-      // 관리자 전용 RPC 2개 호출
       const u = await supabase.rpc('admin_round_user_totals', { p_round: String(id) })
       const p = await supabase.rpc('admin_round_product_totals', { p_round: String(id) })
 
-      if (u.error) {
-        const e = u.error as PostgrestError
-        setError(`사용자 합계 로딩 오류: ${e.message}`)
-        setLoading(false)
-        return
-      }
-      if (p.error) {
-        const e = p.error as PostgrestError
-        setError(`상품 합계 로딩 오류: ${e.message}`)
-        setLoading(false)
-        return
-      }
+      if (u.error) { const e = u.error as PostgrestError; setError(`사용자 합계 로딩 오류: ${e.message}`); setLoading(false); return }
+      if (p.error) { const e = p.error as PostgrestError; setError(`상품 합계 로딩 오류: ${e.message}`); setLoading(false); return }
+
       setUsers((u.data ?? []) as unknown as UserRow[])
       setProducts((p.data ?? []) as unknown as ProductRow[])
       setLoading(false)
@@ -129,7 +118,13 @@ export default function AdminRoundPage() {
             마감: {new Date(round.deadline).toLocaleString()} · 상태: {round.status}
           </p>
         </div>
-        <Link className="underline text-sm" href="/admin">← 관리자 홈</Link>
+        <div className="flex items-center gap-3">
+          {/* ✅ 상품 등록 버튼 */}
+          <Link href={`/admin/rounds/${round.id}/products/new`} className="text-sm rounded border px-3 py-1">
+            상품 등록
+          </Link>
+          <Link className="underline text-sm" href="/admin">← 관리자 홈</Link>
+        </div>
       </div>
 
       {/* 사용자별 합계 */}
