@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+// src/app/rounds/[id]/page.tsx 상단
+import type { PostgrestError } from '@supabase/supabase-js'
+
 
 const isUUID = (s: unknown) =>
   typeof s === 'string' &&
@@ -226,7 +229,7 @@ export default function RoundDetailPage() {
 
       if (error) {
         console.error('RPC resubmit_order_v2 error:', { ...error })
-        const msg = String((error as any)?.message || '')
+        const msg = String((error as PostgrestError)?.message || '')
         if (msg.startsWith('OUT_OF_STOCK')) {
           setError('수정 수량 중 일부가 이미 소진되었습니다. 남은 수량으로 조정해 주세요.')
         } else {
