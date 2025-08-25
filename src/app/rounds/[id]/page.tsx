@@ -6,6 +6,29 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
+const isUUID = (s: unknown) =>
+  typeof s === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
+
+function toInt(v: unknown, fallback = 0) {
+  const n = parseInt(String(v ?? ''), 10)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function buildCleanPayload(
+  qty: Record<string, number>,
+  priceMap: Record<string, number>
+) {
+  const arr: { product_id: string; qty: number; unit_price: number }[] = []
+  for (const [pid, qRaw] of Object.entries(qty)) {
+    if (!isUUID(pid)) throw new Error(`INVALID_PRODUCT_ID:${pid}`)
+    const qtyInt = Math.max(0, toInt(qRaw, 0))
+    const priceNum = Number.isFinite(priceMap[pid]) ? priceMap[pid] : 0
+    arr.push({ product_id: pid, qty: qtyInt, unit_price: priceNum })
+  }
+  return JSON.parse(JSON.stringify(arr)) // undefined/NaN/Infinity 제거
+}
+
 type Round = { id: string; title: string; deadline: string; status: 'open' | 'closed' }
 
 type AvailabilityRow = {
@@ -105,7 +128,7 @@ export default function RoundDetailPage() {
         for (const a of avail) initQty[a.product_id] = 0
 
         if (r3.data) {
-          setExistingOrderId(r3.data.id)
+          setExistingOrderId(String(r3.data.id))
           const prev: Record<string, number> = {}
           for (const it of r3.data.order_items ?? []) {
             prev[it.product_id] = it.qty
@@ -135,81 +158,90 @@ export default function RoundDetailPage() {
   }
 
   const onChangeQty = (pid: string, nextStr: string) => {
-    const next = Number.isFinite(parseInt(nextStr, 10)) ? parseInt(nextStr, 10) : 0
-    const maxSel = maxSelectableFor(pid)
+    const next = toInt(nextStr, 0)
+    const maxSel = maxSelectableFor(pid)        // (기존 함수 그대로 사용)
     const clamped = Math.max(0, Math.min(maxSel, next))
     setQty(prev => ({ ...prev, [pid]: clamped }))
   }
-
   // 신규 제출
   const handleSubmit = async () => {
     if (!id || totalQty <= 0) return
-    setSubmitting(true)
-    setError(null)
+    setSubmitting(true); setError(null)
     try {
-      const payload = Object.entries(qty)
-        .filter(([, q]) => (q || 0) > 0)
-        .map(([product_id, q]) => ({
-          product_id,
-          qty: q,
-          unit_price: priceMap[product_id] ?? 0,
-        }))
+    // ✨ qty/priceMap으로 “깨끗한” payload 생성
+      const payload = buildCleanPayload(qty, priceMap)
+      console.log('submit payload', payload) // 디버그용
 
       const { error } = await supabase.rpc('submit_order', {
-        p_round: String(id),
-        p_items: payload,
+        p_round: String(id),   // 반드시 문자열
+        p_items: payload       // jsonb 파라미터
       })
 
       if (error) {
         const msg = String(error.message || '')
         if (msg.startsWith('OUT_OF_STOCK')) {
           setError('선택하신 수량 중 일부가 이미 소진되었습니다. 남은 수량을 확인하고 다시 시도해 주세요.')
-        } else setError(`제출 오류: ${error.message}`)
+        } else {
+          setError(`제출 오류: ${error.message}`)
+        }
         return
       }
-      router.replace('/') // 성공시 대시보드
+      router.replace('/')
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '알 수 없는 오류'
-      setError(msg)
+      const m = e instanceof Error ? e.message : '알 수 없는 오류'
+      if (m.startsWith('INVALID_PRODUCT_ID:')) {
+        setError('내부 오류: 잘못된 상품 식별자입니다. 페이지를 새로고침해 주세요.')
+      } else {
+        setError(m)
+     }
     } finally {
       setSubmitting(false)
     }
   }
-
   // 재제출(수정)
   const handleResubmit = async () => {
     if (!existingOrderId) return
-    setSubmitting(true)
-    setError(null)
+    setSubmitting(true); setError(null)
     try {
-      const payload = Object.entries(qty)
-        .filter(([, q]) => (q || 0) >= 0) // 0도 허용(해당 품목 삭제)
-        .map(([product_id, q]) => ({
-          product_id,
-          qty: q,
-          unit_price: priceMap[product_id] ?? 0,
-        }))
+    // 화면의 rows 순서대로 배열 구성 (pid/qty/price 길이 동일)
+      const pids: string[] = []
+      const qs: number[] = []
+      const ps: number[] = []
+      for (const row of rows) {
+        const pid = String(row.product_id)
+        const q = Math.max(0, parseInt(String(qty[pid] ?? 0), 10) || 0)
+        const price = Number.isFinite(row.price) ? row.price : 0
+        pids.push(pid)
+        qs.push(q)
+        ps.push(price)
+      }
 
-      const { error } = await supabase.rpc('resubmit_order', {
-        p_order: existingOrderId,
-        p_items: payload,
+    // (products.id 타입에 맞춰 rpc 이름/매개변수 타입을 선택)
+      const { error } = await supabase.rpc('resubmit_order_v2', {
+        p_order: String(existingOrderId),
+        p_product_ids: pids,  // uuid[] 또는 text[]
+        p_qtys: qs,           // int[]
+        p_prices: ps,         // int[]
       })
 
       if (error) {
-        const msg = String(error.message || '')
+        console.error('RPC resubmit_order_v2 error:', { ...error })
+        const msg = String((error as any)?.message || '')
         if (msg.startsWith('OUT_OF_STOCK')) {
           setError('수정 수량 중 일부가 이미 소진되었습니다. 남은 수량으로 조정해 주세요.')
-        } else setError(`수정 오류: ${error.message}`)
+        } else {
+          setError(`수정 오류: ${msg || '알 수 없는 오류'}`)
+        }
         return
       }
-      router.replace('/') // 성공시 대시보드
+      router.replace('/')
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '알 수 없는 오류'
-      setError(msg)
+      setError(e instanceof Error ? e.message : '알 수 없는 오류')
     } finally {
       setSubmitting(false)
     }
   }
+
 
   if (loading) return <main className="p-6">불러오는 중…</main>
 
