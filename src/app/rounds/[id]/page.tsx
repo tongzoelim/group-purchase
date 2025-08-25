@@ -101,7 +101,7 @@ export default function RoundDetailPage() {
           .eq('status', 'submitted')
           .maybeSingle<ExistingOrder>()
 
-        let initQty: Record<string, number> = {}
+        const initQty: Record<string, number> = {}
         for (const a of avail) initQty[a.product_id] = 0
 
         if (r3.data) {
