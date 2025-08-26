@@ -127,7 +127,7 @@ export default function AdminRoundOrdersDetail() {
               <div className="overflow-x-auto mt-3">
                 <table className="min-w-[640px] w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-gray-50">
+                    <tr className="border-b bg-black-50">
                       <th className="text-left p-2">상품명</th>
                       <th className="text-right p-2">단가</th>
                       <th className="text-right p-2">수량</th>

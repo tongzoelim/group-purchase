@@ -136,7 +136,7 @@ export default function AdminRoundPage() {
           <div className="overflow-x-auto">
             <table className="min-w-[720px] w-full text-sm">
               <thead>
-                <tr className="border-b bg-gray-50">
+                <tr className="border-b bg-black-50">
                   <th className="text-left p-2">이름</th>
                   <th className="text-left p-2">이메일</th>
                   <th className="text-right p-2">총 수량</th>
@@ -178,7 +178,7 @@ export default function AdminRoundPage() {
           <div className="overflow-x-auto">
             <table className="min-w-[720px] w-full text-sm">
               <thead>
-                <tr className="border-b bg-gray-50">
+                <tr className="border-b bg-black-50">
                   <th className="text-left p-2">상품명</th>
                   <th className="text-right p-2">단가(원)</th>
                   <th className="text-right p-2">총 수량</th>
