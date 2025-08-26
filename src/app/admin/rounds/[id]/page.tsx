@@ -119,7 +119,30 @@ export default function AdminRoundPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* ✅ 상품 등록 버튼 */}
+          {/* ✅ 회차 상태 토글 버튼 */}
+      <button
+        onClick={async () => {
+          const next = round.status === 'open' ? 'closed' : 'open'
+          if (!confirm(`회차 상태를 '${next}' 로 변경할까요?`)) return
+          try {
+            const { getSupabase } = await import('@/lib/supabase')
+            const supabase = getSupabase()
+            const { error } = await supabase.rpc('admin_close_round', {
+              p_round: round.id,
+              p_status: next
+            })
+            if (error) throw error
+            // 로컬 상태 갱신
+            setRound(prev => prev ? { ...prev, status: next as 'open'|'closed' } : prev)
+          } catch (e) {
+            alert(e instanceof Error ? e.message : '상태 변경 실패')
+          }
+        }}
+        className="text-sm rounded border px-3 py-1"
+      >
+        {round.status === 'open' ? '회차 마감' : '회차 재오픈'}
+      </button>
+          {/* ✅ 상품 등록 버튼 */}         
           <Link href={`/admin/rounds/${round.id}/products/new`} className="text-sm rounded border px-3 py-1">
             상품 등록
           </Link>
