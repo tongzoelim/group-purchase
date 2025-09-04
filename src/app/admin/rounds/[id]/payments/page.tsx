@@ -208,7 +208,7 @@ function PaymentRow({ row, onUpdate }: {
         <select
           className="border rounded px-2 py-1"
           value={status}
-          onChange={(e)=>setStatus(e.target.value as any)}
+          onChange={(e)=>setStatus(e.target.value as Row['payment_status'])}
         >
           <option value="unpaid">미입금</option>
           <option value="partial">부분입금</option>
