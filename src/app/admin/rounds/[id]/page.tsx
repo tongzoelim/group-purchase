@@ -222,6 +222,12 @@ export default function AdminRoundPage() {
           </div>
         )}
       </section>
+    {/* 결제 관리 버튼 */}
+    <div>
+      <Link href={`/admin/rounds/${round.id}/payments`} className="text-sm rounded border px-3 py-1">
+        결제 관리
+      </Link>
+    </div>
     </main>
   )
 }
