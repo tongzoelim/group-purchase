@@ -40,18 +40,28 @@ export default function AdminPaymentsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // ✅ 모드: 자동 저장 vs 일괄 저장
+  // ✅ 자동 저장 / 일괄 저장
   const [autoSave, setAutoSave] = useState(true)
-  // 일괄 저장 모드에서 변경된 행을 담아둠: key = order_id
   const [dirtyMap, setDirtyMap] = useState<Record<string, DirtyPatch>>({})
 
-  const filtered = rows // 필터가 필요하면 여기에 추가
+  // ✅ 상태 필터
+  const [filter, setFilter] = useState<'all'|PaymentStatus>('all')
+
+  // 필터 적용 목록
+  const filtered: Row[] = useMemo(
+    () => rows.filter(r => (filter === 'all' ? true : r.payment_status === filter)),
+    [rows, filter]
+  )
+
+  // 요약 (필터 반영)
   const totals = useMemo(() => {
-    const people = filtered.length
     const amount = filtered.reduce((s, r) => s + (r.total_amount || 0), 0)
     const qty = filtered.reduce((s, r) => s + (r.total_qty || 0), 0)
-    const paid = filtered.reduce((s, r) => s + (r.payment_status === 'paid' ? (r.payment_amount ?? r.total_amount ?? 0) : 0), 0)
-    return { people, qty, amount, paid }
+    const paidSum = filtered.reduce(
+      (s, r) => s + (r.payment_status === 'paid' ? (r.payment_amount ?? r.total_amount ?? 0) : 0),
+      0
+    )
+    return { people: filtered.length, qty, amount, paid: paidSum }
   }, [filtered])
 
   useEffect(() => {
@@ -66,7 +76,10 @@ export default function AdminPaymentsPage() {
       if (pr.error || !pr.data?.is_admin) { setIsAdmin(false); setLoading(false); return }
       setIsAdmin(true)
 
-      const r1 = await supabase.from('rounds').select('id,title,deadline,status').eq('id', String(id)).single<Round>()
+      const r1 = await supabase.from('rounds')
+        .select('id,title,deadline,status')
+        .eq('id', String(id))
+        .single<Round>()
       if (r1.error) { setError(r1.error.message); setLoading(false); return }
       setRound(r1.data)
 
@@ -78,13 +91,16 @@ export default function AdminPaymentsPage() {
     void run()
   }, [id, router])
 
+  // 서버 저장 RPC 호출
   const callSetPayment = async (order_id: string, patch: DirtyPatch) => {
-    const row = rows.find(r => r.order_id === order_id)
-    if (!row) throw new Error('행을 찾을 수 없습니다.')
+    const current = rows.find(r => r.order_id === order_id)
+    if (!current) throw new Error('행을 찾을 수 없습니다.')
 
-    const status: PaymentStatus = patch.payment_status ?? row.payment_status
-    const amount: number | null = (patch.payment_amount !== undefined) ? patch.payment_amount : (row.payment_amount ?? null)
-    const note: string | null = (patch.payment_note !== undefined) ? patch.payment_note : (row.payment_note ?? null)
+    const status: PaymentStatus = patch.payment_status ?? current.payment_status
+    const amount: number | null =
+      patch.payment_amount !== undefined ? patch.payment_amount : (current.payment_amount ?? null)
+    const note: string | null =
+      patch.payment_note !== undefined ? patch.payment_note : (current.payment_note ?? null)
 
     const { error: rpcErr } = await supabase.rpc('admin_set_payment', {
       p_order: order_id,
@@ -113,7 +129,6 @@ export default function AdminPaymentsPage() {
   const saveSelectedDirty = async () => {
     const entries = Object.entries(dirtyMap)
     if (entries.length === 0) return
-    // 순차 실행 (수가 많으면 Promise.allSettled도 가능)
     for (const [order_id, patch] of entries) {
       await callSetPayment(order_id, patch)
     }
@@ -152,7 +167,7 @@ export default function AdminPaymentsPage() {
         </div>
       </div>
 
-      {/* 상단 컨트롤 */}
+      {/* 상단 컨트롤: 자동 저장 & 필터 & 일괄 저장 */}
       <section className="rounded border p-4 flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">
           <input
@@ -162,6 +177,22 @@ export default function AdminPaymentsPage() {
           />
           자동 저장
         </label>
+
+        {/* 상태 필터 */}
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600">상태 필터:</span>
+          {(['all','unpaid','partial','paid'] as const).map(k => (
+            <button
+              key={k}
+              className={`text-sm rounded border px-3 py-1 ${filter===k ? 'bg-black text-white' : ''}`}
+              onClick={()=>setFilter(k)}
+            >
+              {k === 'all' ? '전체' : k === 'unpaid' ? '미입금' : k === 'partial' ? '부분입금' : '완납'}
+            </button>
+          ))}
+        </div>
+
+        {/* 일괄 저장 모드 컨트롤 */}
         {!autoSave && (
           <>
             <span className="text-gray-600">변경된 항목: {Object.keys(dirtyMap).length}건</span>
@@ -183,9 +214,9 @@ export default function AdminPaymentsPage() {
         )}
       </section>
 
-      {/* 요약 */}
+      {/* 요약 카드 (필터 반영) */}
       <section className="rounded border p-4 grid md:grid-cols-4 gap-3 text-sm">
-        <div><div className="text-gray-500">인원</div><div className="text-lg font-semibold">{totals.people}명</div></div>
+        <div><div className="text-gray-500">선택 인원</div><div className="text-lg font-semibold">{totals.people}명</div></div>
         <div><div className="text-gray-500">총 수량</div><div className="text-lg font-semibold">{totals.qty}</div></div>
         <div><div className="text-gray-500">총 금액</div><div className="text-lg font-semibold">{totals.amount.toLocaleString()}원</div></div>
         <div><div className="text-gray-500">완납 합계</div><div className="text-lg font-semibold">{totals.paid.toLocaleString()}원</div></div>
@@ -194,12 +225,12 @@ export default function AdminPaymentsPage() {
       {/* 테이블 */}
       <section className="rounded border p-4">
         {filtered.length === 0 ? (
-          <p className="text-sm text-gray-600">데이터가 없습니다.</p>
+          <p className="text-sm text-gray-600">해당 조건의 데이터가 없습니다.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1000px] w-full text-sm">
               <thead>
-                <tr className="border-b bg-gray-50">
+                <tr className="border-b bg-black-50">
                   <th className="text-left p-2">이름</th>
                   <th className="text-left p-2">이메일</th>
                   <th className="text-right p-2">총 수량</th>
@@ -219,7 +250,7 @@ export default function AdminPaymentsPage() {
                     onSave={callSetPayment}
                     markDirty={(order_id, patch) => {
                       setDirtyMap(prev => ({ ...prev, [order_id]: { ...(prev[order_id] ?? {}), ...patch } }))
-                      // 미리 보이는 값도 즉시 반영
+                      // 화면 반영
                       setRows(prev => prev.map(x => x.order_id === order_id ? { ...x, ...patch } as Row : x))
                     }}
                     clearDirty={(order_id) => {
@@ -262,10 +293,10 @@ function PaymentRow({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearTimer = () => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null } }
 
-  // 상태 변경 → 즉시 저장(자동 저장 모드일 때)
+  // 상태 변경 → 즉시 저장(자동 저장 모드)
   useEffect(() => {
     if (!autoSave) {
-      // 일괄 저장 모드: 더티마크만
+      // 일괄 저장 모드: 더티 마크만
       markDirty(row.order_id, { payment_status: status })
       return
     }
@@ -287,17 +318,21 @@ function PaymentRow({
   // 금액/메모 입력 디바운스 자동 저장
   useEffect(() => {
     if (!autoSave) {
-      // 일괄 저장 모드: 더티마크만
       const amt = amount.trim() === '' ? null : Number(amount)
-      markDirty(row.order_id, { payment_amount: Number.isNaN(amt as number) ? null : amt, payment_note: note.trim() || null })
+      markDirty(row.order_id, {
+        payment_amount: Number.isNaN(amt as number) ? null : amt,
+        payment_note: note.trim() || null
+      })
       return
     }
-    // 자동 저장 모드: 디바운스 800ms
     clearTimer()
     timerRef.current = setTimeout(() => {
       const amt = amount.trim() === '' ? null : Number(amount)
       setSaving(true); setMsg(null)
-      onSave(row.order_id, { payment_amount: Number.isNaN(amt as number) ? null : amt, payment_note: note.trim() || null })
+      onSave(row.order_id, {
+        payment_amount: Number.isNaN(amt as number) ? null : amt,
+        payment_note: note.trim() || null
+      })
         .then(() => {
           setMsg('저장됨')
           clearDirty(row.order_id)
@@ -312,9 +347,9 @@ function PaymentRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amount, note, autoSave])
 
-  const onBlurSave = async () => {
-    if (autoSave) return // 자동 저장이면 디바운스로 충분
-    // 일괄 저장 모드에선 blur에서도 저장하지 않음(모으기)
+  const onBlurSave = () => {
+    // 자동 저장 모드면 디바운스로 처리되고,
+    // 일괄 저장 모드면 blur 시 저장하지 않음(모아두기)
   }
 
   return (
@@ -357,7 +392,9 @@ function PaymentRow({
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNote(e.target.value)}
           onBlur={onBlurSave}
         />
-        <div className="text-xs text-gray-600 mt-1 h-4">{saving ? '저장중…' : (msg ?? '')}</div>
+        <div className="text-xs text-gray-600 mt-1 h-4">
+          {saving ? '저장중…' : (msg ?? '')}
+        </div>
       </td>
       <td className="p-2 text-xs text-gray-600">{new Date(row.updated_at).toLocaleString()}</td>
     </tr>
